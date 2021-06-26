@@ -140,7 +140,7 @@ def runMinecraft(path, command, verbose=False, timeout=None):
         try:
             mc.communicate(input=b'save-all\r\nstop\r\n', timeout=timeout)
             #mc.communicate(input=b'stop\r\n')
-        except TimeoutExpired:
+        except subprocess.TimeoutExpired:
             print("Warning: timeout expired, killing server process", flush=True)
             mc.kill()
             mc.communicate()
