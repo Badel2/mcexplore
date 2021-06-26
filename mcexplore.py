@@ -26,7 +26,8 @@ def main():
     parser.add_option("-x", dest="xorigin", type="int", help="Set the X offset to generate land around. Defaults to the server's spawn point.")
     parser.add_option("-z", dest="zorigin", type="int", help="Set the Z offset to generate land around. Defaults to the server's spawn point.")
     parser.add_option("-r", "--regions", action="store_true", dest="regions", default=False, help="When enabled, measure in regions instead of chunks.")
-    parser.add_option("--spawnsize", dest="spawnsize", default=368, help="The number of blocks to move the spawn point on every server restart. Higher values may miss the population stage of some chunks at the border. This is the length of the side of a square centered around the spawn point. Should be a multiple of 16. Common values: 368, 384, 400. Default: 368")
+    parser.add_option("--spawnsize", dest="spawnsize", type="int", default=368, help="The number of blocks to move the spawn point on every server restart. Higher values may miss the population stage of some chunks at the border. This is the length of the side of a square centered around the spawn point. Should be a multiple of 16. Common values: 368, 384, 400. Default: 368")
+    parser.add_option("--timeout", dest="timeout", type="int", default=300, help="Number of seconds that we let the minecraft server run before restarting. This is useful to avoid deadlocks. The server should be able to safely generate the spawn area in that time. Default: 300")
     (options, args) = parser.parse_args()
     
     # exit with an error if no arguments were passed
@@ -53,7 +54,7 @@ def main():
     # do a dry run if the server hasn't started at least once
     if not os.path.isfile(os.path.join(options.path, 'server.properties')):
         print("Generating world and server.properties")
-        runMinecraft(options.path, options.command, options.verbose)
+        runMinecraft(options.path, options.command, options.verbose, options.timeout)
 
     # parse the server.properties file to get the world name
     properties = parseConfig(os.path.join(options.path, 'server.properties'))
@@ -109,7 +110,7 @@ def main():
             if z > options.zorigin + zsize / 2: z = options.zorigin + zsize / 2
             print("[%d/%d] Setting spawn to %d, %d" % (iterations, totaliterations, x, z), flush=True)
             setSpawn(level, (int(x), int(64), int(z)))
-            runMinecraft(options.path, options.command, options.verbose)
+            runMinecraft(options.path, options.command, options.verbose, options.timeout)
 
     # restore the old spawn point
     print("Restoring original spawn of %d, %d, %d" % originalspawn)
@@ -127,17 +128,28 @@ def setSpawn(level, coords):
     (f["Data"]["SpawnX"].value, f["Data"]["SpawnY"].value, f["Data"]["SpawnZ"].value) = coords
     f.write_file(level)
 
-def runMinecraft(path, command, verbose=False):
+def runMinecraft(path, command, verbose=False, timeout=None):
     """Runs a minecraft server, and stops it as soon as possible."""
     if verbose:
         outstream = sys.stdout
     else:
         outstream = subprocess.PIPE
-    mc = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=outstream, stderr=subprocess.STDOUT, cwd=path)
-    mc.communicate(input=b'save-all\r\nstop\r\n')
-    #mc.communicate(input=b'stop\r\n')
-    return_code = mc.wait()
-    assert return_code == 0
+
+    while True:
+        mc = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=outstream, stderr=subprocess.STDOUT, cwd=path)
+        try:
+            mc.communicate(input=b'save-all\r\nstop\r\n', timeout=timeout)
+            #mc.communicate(input=b'stop\r\n')
+        except TimeoutExpired:
+            print("Warning: timeout expired, killing server process", flush=True)
+            mc.kill()
+            mc.communicate()
+            return_code = mc.wait()
+            print("Killed server process (exit code %d), restarting" % (return_code))
+            continue
+        return_code = mc.wait()
+        assert return_code == 0
+        return
 
 def parseConfig(filename):
     """Parses a server.properties file. Accepts the path to the file as an argument, and returns the key/value pairs."""
