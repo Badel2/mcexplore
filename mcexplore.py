@@ -98,13 +98,16 @@ def main():
     print("Size of area to map in meters: %d, %d" % (xsize + spawnsize, zsize + spawnsize))
     xiterations = int(math.ceil(xsize / spawnsize) + 1)
     ziterations = int(math.ceil(zsize / spawnsize) + 1)
+    totaliterations = xiterations * ziterations
+    iterations = 0
     for xcount in range(0, xiterations):
         x = options.xorigin - xsize / 2 + xcount * spawnsize
         if x > options.xorigin + xsize / 2: x = options.xorigin + xsize / 2
         for zcount in range(0, ziterations):
+            iterations += 1
             z = options.zorigin - zsize / 2 + zcount * spawnsize
             if z > options.zorigin + zsize / 2: z = options.zorigin + zsize / 2
-            print("Setting spawn to %d, %d" % (x, z))
+            print("[%d/%d] Setting spawn to %d, %d" % (iterations, totaliterations, x, z), flush=True)
             setSpawn(level, (int(x), int(64), int(z)))
             runMinecraft(options.path, options.command, options.verbose)
 
