@@ -140,16 +140,15 @@ def runMinecraft(path, command, verbose=False, timeout=None):
         try:
             mc.communicate(input=b'save-all\r\nstop\r\n', timeout=timeout)
             #mc.communicate(input=b'stop\r\n')
+            return_code = mc.wait()
+            assert return_code == 0
+            return
         except subprocess.TimeoutExpired:
             print("Warning: timeout expired, killing server process", flush=True)
             mc.kill()
             mc.communicate()
             return_code = mc.wait()
             print("Killed server process (exit code %d), restarting" % (return_code))
-            continue
-        return_code = mc.wait()
-        assert return_code == 0
-        return
 
 def parseConfig(filename):
     """Parses a server.properties file. Accepts the path to the file as an argument, and returns the key/value pairs."""
